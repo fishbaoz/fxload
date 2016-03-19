@@ -201,12 +201,15 @@ static int ezusb_read (
 	USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE, opcode,
 	addr, 0,
 	data, len);
+    printf("Status=%x\n", status);
     if (status != len) {
 	if (status < 0)
 	    logerror("%s: %s\n", label, strerror(errno));
 	else
 	    logerror("%s ==> %d\n", label, status);
     }
+    printf("data[0]=%x\n", data[0]);
+
     return status;
 }
 
@@ -278,6 +281,10 @@ static inline int ezusb_get_eeprom_type (int fd, unsigned char *data)
     return ezusb_read (fd, "get EEPROM size", GET_EEPROM_SIZE, 0, data, 1);
 }
 
+static int ezusb_upload_eeprom(int fd, unsigned char *data)
+{
+	return ezusb_read (fd, "Get EEPROM data", RW_EEPROM, 0, data, 0x80);
+}
 /*****************************************************************************/
 
 /*
@@ -690,11 +697,20 @@ int ezusb_load_eeprom (int dev, const char *path, const char *type, int config)
     struct eeprom_poke_context	ctx;
     int				status;
     unsigned char		value, first_byte;
+    unsigned char               buffer[0x100]={0};
+    int i;
 
+    #if 0
     if (ezusb_get_eeprom_type (dev, &value) != 1 || value != 1) {
 	logerror("don't see a large enough EEPROM\n");
 	return -1;
     }
+    #endif
+
+//    ezusb_upload_eeprom(dev, buffer);
+//    for (i=0; i<0x100; i++)
+//	    printf(" %2X", buffer[i]);
+//    return -1;
 
     image = fopen (path, "r");
     if (image == 0) {
@@ -808,6 +824,7 @@ int ezusb_load_eeprom (int dev, const char *path, const char *type, int config)
     }
 
     /* make the EEPROM say to boot from this EEPROM */
+    printf("first byte=%x\n", first_byte);
     status = ezusb_write (dev, "write EEPROM type byte",
 	    RW_EEPROM, 0, &first_byte, sizeof first_byte);
     if (status < 0)
