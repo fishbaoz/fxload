@@ -281,9 +281,22 @@ static inline int ezusb_get_eeprom_type (int fd, unsigned char *data)
     return ezusb_read (fd, "get EEPROM size", GET_EEPROM_SIZE, 0, data, 1);
 }
 
-static int ezusb_upload_eeprom(int fd, unsigned char *data)
+static int ezusb_upload_eeprom(int dev, unsigned char *data)
 {
-	return ezusb_read (fd, "Get EEPROM data", RW_EEPROM, 0, data, 0x80);
+    int	status;
+    int adr;
+
+
+    // Assume EEPROM size of 8k (24LC64).
+    for(adr=0; adr<8192*2; adr+=80)
+    {
+    	status = ezusb_read (dev, "Get EEPROM data",
+	    RW_EEPROM, adr, data+adr, 0x80);
+   	if (status < 0)
+	    return status;
+    }
+
+    return 0;
 }
 /*****************************************************************************/
 
@@ -681,6 +694,46 @@ static int eeprom_poke (
     return 0;
 }
 
+int ezusb_erase_eeprom (int dev)
+{
+    int	status;
+    int adr;
+    unsigned char buf[32];
+
+    memset(buf,0xff,32);
+
+    // Assume EEPROM size of 8k (24LC64).
+    for(adr=0; adr<8192*2; adr+=32)
+    {
+    	status = ezusb_write (dev, "overwrite EEPROM with 0xff",
+	    RW_EEPROM, adr, buf, 32);
+   	if (status < 0)
+	    return status;
+    }
+
+    return 0;
+}
+
+int ezusb_writebin_eeprom (int dev, unsigned char *buffer)
+{
+    int	status;
+    int adr;
+//    unsigned char buf[32];
+
+//    memset(buf,0xff,32);
+
+    // Assume EEPROM size of 8k (24LC64).
+    for(adr=0; adr<0x1100; adr+=32)
+    {
+    	status = ezusb_write (dev, "overwrite EEPROM",
+	    RW_EEPROM, adr, buffer+adr, 32);
+   	if (status < 0)
+	    return status;
+    }
+
+    return 0;
+}
+
 /*
  * Load an Intel HEX file into target (large) EEPROM, set up to boot from
  * that EEPROM using the specified microcontroller-specific config byte.
@@ -697,7 +750,6 @@ int ezusb_load_eeprom (int dev, const char *path, const char *type, int config)
     struct eeprom_poke_context	ctx;
     int				status;
     unsigned char		value, first_byte;
-    unsigned char               buffer[0x100]={0};
     int i;
 
     #if 0
@@ -707,9 +759,19 @@ int ezusb_load_eeprom (int dev, const char *path, const char *type, int config)
     }
     #endif
 
+//    ezusb_writebin_eeprom(dev, buffer);
+//    return -1;
+//    ezusb_erase_eeprom(dev);
+//    return -1;
+
+//    memset(buffer,0xff, 16384);
 //    ezusb_upload_eeprom(dev, buffer);
-//    for (i=0; i<0x100; i++)
-//	    printf(" %2X", buffer[i]);
+//    printf("\n%08X:", 0);
+//    for (i=0; i<sizeof(buffer); i++) {
+//	    printf(" %02X", buffer[i]);
+//	    if ((i % 16) == 15)
+//		    printf("\n%08X:", i);
+//    }
 //    return -1;
 
     image = fopen (path, "r");
